@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mes tâches</title>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>Mes tâches</h1>
+      <p class="subtitle">Organisées par projet, sauvegardées dans votre navigateur (IndexedDB).</p>
+    </header>
+
+    <section class="card">
+      <h2>Projets</h2>
+      <form id="project-form" class="inline-form">
+        <input id="project-name" type="text" placeholder="Nom du nouveau projet" data-testid="project-name" required>
+        <button type="submit" data-testid="add-project">Ajouter</button>
+      </form>
+
+      <label class="field-label" for="project-select">Projet actif</label>
+      <select id="project-select" data-testid="project-select"></select>
+    </section>
+
+    <section class="card">
+      <h2>Tâches</h2>
+      <form id="task-form" class="inline-form">
+        <input id="task-title" type="text" placeholder="Nouvelle tâche" data-testid="task-title" required>
+        <button type="submit" data-testid="add-task">Ajouter</button>
+      </form>
+
+      <ul id="task-list" data-testid="task-list" class="task-list"></ul>
+      <p id="empty-state" class="empty-state" hidden>Aucune tâche pour ce projet pour le moment.</p>
+    </section>
+  </div>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
