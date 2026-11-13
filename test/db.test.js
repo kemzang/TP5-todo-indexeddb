@@ -1,23 +1,36 @@
+// fake-indexeddb installe une implementation d'IndexedDB en memoire dans Node
+// (qui n'en a pas). Utilise UNIQUEMENT par les tests : l'application, elle,
+// tourne dans le navigateur avec le vrai IndexedDB.
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { openDatabase, addProject, getProjects, addTask, getTasksByProject, updateTask } from '../src/db.js';
+import {
+  openDatabase,
+  addProject,
+  getProjects,
+  deleteProject,
+  addTask,
+  getTask,
+  getTasksByProject,
+  updateTask,
+  deleteTask,
+} from '../src/db.js';
 
-describe('db', () => {
-  let db;
+let db;
 
-  beforeEach(async () => {
-    await new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase('todo-app');
-      request.onsuccess = resolve;
-      request.onerror = () => reject(request.error);
-    });
-    db = await openDatabase();
+beforeEach(async () => {
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase('todo-app');
+    request.onsuccess = resolve;
+    request.onerror = () => reject(request.error);
   });
+  db = await openDatabase();
+});
 
-  afterEach(() => {
-    db.close();
-  });
+afterEach(() => {
+  db.close();
+});
 
+describe('projets', () => {
   it('ajoute un projet et le retrouve', async () => {
     const id = await addProject(db, 'Maison');
     const projects = await getProjects(db);
@@ -25,57 +38,117 @@ describe('db', () => {
     expect(projects[0]).toMatchObject({ id, name: 'Maison' });
   });
 
-  it('refuse un projet sans nom', async () => {
-    await expect(addProject(db, '')).rejects.toThrow();
+  it('nettoie les espaces autour du nom', async () => {
+    await addProject(db, '   Maison  ');
+    const [project] = await getProjects(db);
+    expect(project.name).toBe('Maison');
   });
 
-  it('ajoute une tache a un projet', async () => {
-    const projectId = await addProject(db, 'Travail');
+  it.each(['', '   ', null, undefined])('refuse un nom de projet invalide (%j)', async (name) => {
+    await expect(addProject(db, name)).rejects.toThrow('Le nom du projet est requis');
+    expect(await getProjects(db)).toHaveLength(0);
+  });
+
+  it('supprime un projet et toutes ses taches (cascade)', async () => {
+    const p1 = await addProject(db, 'A supprimer');
+    const p2 = await addProject(db, 'A garder');
+    await addTask(db, { title: 'T1', projectId: p1 });
+    await addTask(db, { title: 'T2', projectId: p1 });
+    await addTask(db, { title: 'T3', projectId: p2 });
+
+    const removed = await deleteProject(db, p1);
+
+    expect(removed).toBe(2);
+    expect(await getProjects(db)).toMatchObject([{ id: p2 }]);
+    expect(await getTasksByProject(db, p1)).toHaveLength(0);
+    expect(await getTasksByProject(db, p2)).toHaveLength(1);
+  });
+
+  it("rejette la suppression d'un projet inexistant", async () => {
+    await expect(deleteProject(db, 999)).rejects.toThrow('Projet introuvable');
+  });
+});
+
+describe('taches', () => {
+  let projectId;
+
+  beforeEach(async () => {
+    projectId = await addProject(db, 'Travail');
+  });
+
+  it('ajoute une tache a un projet, non terminee par defaut', async () => {
     const taskId = await addTask(db, { title: 'Ecrire le rapport', projectId });
     const tasks = await getTasksByProject(db, projectId);
     expect(tasks).toHaveLength(1);
     expect(tasks[0]).toMatchObject({ id: taskId, title: 'Ecrire le rapport', projectId, done: false });
+    expect(typeof tasks[0].createdAt).toBe('number');
   });
 
   it('refuse une tache sans projet', async () => {
-    await expect(addTask(db, { title: 'Orpheline', projectId: null })).rejects.toThrow();
+    await expect(addTask(db, { title: 'Orpheline', projectId: null })).rejects.toThrow(
+      'La tache doit appartenir a un projet',
+    );
   });
 
-  it("refuse une tache sans titre", async () => {
-    const projectId = await addProject(db, 'Travail');
-    await expect(addTask(db, { title: '  ', projectId })).rejects.toThrow();
+  it('refuse une tache rattachee a un projet inexistant', async () => {
+    await expect(addTask(db, { title: 'Fantome', projectId: 999 })).rejects.toThrow('Projet introuvable');
+    expect(await getTasksByProject(db, 999)).toHaveLength(0);
+  });
+
+  it.each(['', '   '])('refuse une tache sans titre (%j)', async (title) => {
+    await expect(addTask(db, { title, projectId })).rejects.toThrow('Le titre de la tache est requis');
   });
 
   it("modifie le titre d'une tache existante", async () => {
-    const projectId = await addProject(db, 'Travail');
     const taskId = await addTask(db, { title: 'Brouillon', projectId });
-    await updateTask(db, taskId, { title: 'Version finale' });
-    const tasks = await getTasksByProject(db, projectId);
-    expect(tasks[0].title).toBe('Version finale');
+    await updateTask(db, taskId, { title: '  Version finale ' });
+    expect((await getTask(db, taskId)).title).toBe('Version finale');
   });
 
-  it('marque une tache comme terminee sans toucher au reste', async () => {
-    const projectId = await addProject(db, 'Travail');
+  it('refuse de renommer une tache avec un titre vide', async () => {
+    const taskId = await addTask(db, { title: 'Brouillon', projectId });
+    await expect(updateTask(db, taskId, { title: '  ' })).rejects.toThrow();
+    expect((await getTask(db, taskId)).title).toBe('Brouillon');
+  });
+
+  it('marque une tache comme terminee puis la rouvre, sans toucher au reste', async () => {
     const taskId = await addTask(db, { title: 'A faire', projectId });
     await updateTask(db, taskId, { done: true });
-    const tasks = await getTasksByProject(db, projectId);
-    expect(tasks[0]).toMatchObject({ title: 'A faire', done: true, projectId });
+    expect(await getTask(db, taskId)).toMatchObject({ title: 'A faire', done: true, projectId });
+    await updateTask(db, taskId, { done: false });
+    expect((await getTask(db, taskId)).done).toBe(false);
   });
 
-  it('rejette la modification d\'une tache inexistante', async () => {
-    await expect(updateTask(db, 999, { title: 'x' })).rejects.toThrow();
+  it("ne permet pas de changer l'id ni le projet via updateTask", async () => {
+    const taskId = await addTask(db, { title: 'Stable', projectId });
+    const updated = await updateTask(db, taskId, { id: 42, projectId: 777 });
+    expect(updated).toMatchObject({ id: taskId, projectId });
+  });
+
+  it("rejette la modification d'une tache inexistante", async () => {
+    await expect(updateTask(db, 999, { title: 'x' })).rejects.toThrow('Tache introuvable');
+  });
+
+  it('supprime une tache', async () => {
+    const keep = await addTask(db, { title: 'Garder', projectId });
+    const remove = await addTask(db, { title: 'Supprimer', projectId });
+    await deleteTask(db, remove);
+    const tasks = await getTasksByProject(db, projectId);
+    expect(tasks.map((t) => t.id)).toEqual([keep]);
+  });
+
+  it("rejette la suppression d'une tache inexistante", async () => {
+    await expect(deleteTask(db, 999)).rejects.toThrow('Tache introuvable');
   });
 
   it('isole les taches par projet', async () => {
-    const p1 = await addProject(db, 'Projet A');
-    const p2 = await addProject(db, 'Projet B');
-    await addTask(db, { title: 'Tache A', projectId: p1 });
-    await addTask(db, { title: 'Tache B', projectId: p2 });
+    const autre = await addProject(db, 'Autre');
+    await addTask(db, { title: 'Tache A', projectId });
+    await addTask(db, { title: 'Tache B', projectId: autre });
 
-    const tasksA = await getTasksByProject(db, p1);
-    const tasksB = await getTasksByProject(db, p2);
-    expect(tasksA).toHaveLength(1);
-    expect(tasksB).toHaveLength(1);
-    expect(tasksA[0].title).toBe('Tache A');
+    const tasksA = await getTasksByProject(db, projectId);
+    const tasksB = await getTasksByProject(db, autre);
+    expect(tasksA.map((t) => t.title)).toEqual(['Tache A']);
+    expect(tasksB.map((t) => t.title)).toEqual(['Tache B']);
   });
 });

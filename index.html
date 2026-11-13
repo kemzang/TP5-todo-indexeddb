@@ -3,38 +3,103 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Gestionnaire de tâches par projet, persistées localement avec IndexedDB.">
   <title>Mes tâches</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='5'/%3E%3Cpath d='m8 12 3 3 5-6'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
-  <div class="app">
-    <header class="app-header">
-      <h1>Mes tâches</h1>
-      <p class="subtitle">Organisées par projet, sauvegardées dans votre navigateur (IndexedDB).</p>
-    </header>
+  <!-- Icônes SVG réutilisées via <use href="#..."> -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z M13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></g></symbol>
+  </svg>
 
-    <section class="card">
-      <h2>Projets</h2>
-      <form id="project-form" class="inline-form">
-        <input id="project-name" type="text" placeholder="Nom du nouveau projet" data-testid="project-name" required>
-        <button type="submit" data-testid="add-project">Ajouter</button>
+  <div class="layout">
+    <!-- ===== Barre latérale : projets ===== -->
+    <aside class="sidebar" aria-label="Projets">
+      <div class="brand">
+        <span class="brand-logo" aria-hidden="true"><svg><use href="#i-check"/></svg></span>
+        <div>
+          <p class="brand-name">Mes tâches</p>
+          <p class="brand-tagline"><svg aria-hidden="true"><use href="#i-db"/></svg> Stockage local IndexedDB</p>
+        </div>
+      </div>
+
+      <h2 class="section-title">Projets</h2>
+      <ul id="project-list" class="project-list" data-testid="project-list"></ul>
+      <p id="projects-empty" class="sidebar-empty" hidden>Aucun projet pour l'instant.</p>
+
+      <form id="project-form" class="add-form add-form--compact" novalidate>
+        <label class="visually-hidden" for="project-name">Nom du nouveau projet</label>
+        <input id="project-name" type="text" placeholder="Nouveau projet" maxlength="60" autocomplete="off" data-testid="project-name">
+        <button type="submit" class="btn btn-primary btn-icon" data-testid="add-project" aria-label="Ajouter le projet" title="Ajouter le projet">
+          <svg aria-hidden="true"><use href="#i-plus"/></svg>
+        </button>
       </form>
+      <p id="project-error" class="form-error" role="alert" data-testid="project-error" hidden></p>
+    </aside>
 
-      <label class="field-label" for="project-select">Projet actif</label>
-      <select id="project-select" data-testid="project-select"></select>
-    </section>
+    <!-- ===== Contenu principal : tâches du projet actif ===== -->
+    <main class="main">
+      <section id="no-project" class="welcome" hidden>
+        <span class="welcome-icon" aria-hidden="true"><svg><use href="#i-folder"/></svg></span>
+        <h1>Commencez par créer un projet</h1>
+        <p>Les tâches sont toujours rattachées à un projet. Ajoutez-en un dans la barre latérale.</p>
+      </section>
 
-    <section class="card">
-      <h2>Tâches</h2>
-      <form id="task-form" class="inline-form">
-        <input id="task-title" type="text" placeholder="Nouvelle tâche" data-testid="task-title" required>
-        <button type="submit" data-testid="add-task">Ajouter</button>
-      </form>
+      <section id="project-view" class="project-view" hidden>
+        <header class="project-header">
+          <div>
+            <p class="eyebrow">Projet</p>
+            <h1 id="project-title" data-testid="project-title"></h1>
+          </div>
+          <button id="delete-project" type="button" class="btn btn-ghost btn-danger-text" data-testid="delete-project">
+            <svg aria-hidden="true"><use href="#i-trash"/></svg>
+            Supprimer le projet
+          </button>
+        </header>
 
-      <ul id="task-list" data-testid="task-list" class="task-list"></ul>
-      <p id="empty-state" class="empty-state" hidden>Aucune tâche pour ce projet pour le moment.</p>
-    </section>
+        <div class="progress" aria-live="polite">
+          <div class="progress-bar"><span id="progress-fill"></span></div>
+          <p id="progress-label" class="progress-label" data-testid="progress-label"></p>
+        </div>
+
+        <form id="task-form" class="add-form" novalidate>
+          <label class="visually-hidden" for="task-title">Nouvelle tâche</label>
+          <input id="task-title" type="text" placeholder="Ajouter une tâche…" maxlength="200" autocomplete="off" data-testid="task-title">
+          <button type="submit" class="btn btn-primary" data-testid="add-task">
+            <svg aria-hidden="true"><use href="#i-plus"/></svg>
+            Ajouter
+          </button>
+        </form>
+        <p id="task-error" class="form-error" role="alert" data-testid="task-error" hidden></p>
+
+        <ul id="task-list" class="task-list" data-testid="task-list"></ul>
+        <p id="empty-state" class="empty-state" data-testid="empty-state" hidden>
+          Aucune tâche dans ce projet. Ajoutez la première ci-dessus.
+        </p>
+      </section>
+    </main>
   </div>
+
+  <!-- Boîte de confirmation (élément natif <dialog>) -->
+  <dialog id="confirm-dialog" class="dialog" data-testid="confirm-dialog">
+    <form method="dialog">
+      <h2 id="confirm-title" class="dialog-title"></h2>
+      <p id="confirm-message" class="dialog-message"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn btn-secondary" data-testid="confirm-cancel">Annuler</button>
+        <button value="confirm" class="btn btn-danger" data-testid="confirm-ok">Supprimer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script type="module" src="src/app.js"></script>
 </body>
