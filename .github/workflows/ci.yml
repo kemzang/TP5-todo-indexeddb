@@ -48,8 +48,6 @@ jobs:
   performance:
     needs: test
     runs-on: ubuntu-latest
-    env:
-      K6_MODE: local # binaire k6 installe ci-dessous ; Chrome est deja present sur le runner
     steps:
       - uses: actions/checkout@v5
 
@@ -64,7 +62,11 @@ jobs:
 
       - name: Test de charge HTTP (k6)
         run: npm run perf:charge
+        env:
+          K6_MODE: local # binaire k6 installe par setup-k6-action
 
+      # Image Docker officielle grafana/k6:latest-with-browser (Chromium inclus),
+      # identique a l'execution locale : le Chrome du runner plante sous k6.
       - name: Test de performance dans le navigateur (k6 browser)
         run: npm run perf:navigateur
 
