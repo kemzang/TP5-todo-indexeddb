@@ -2,6 +2,7 @@ module.exports = {
   default: {
     paths: ['features/**/*.feature'],
     import: ['features/step_definitions/**/*.js'],
-    format: ['progress'],
+    // Terminal + rapport HTML autonome (reports/cucumber-report.html)
+    format: ['progress', 'html:reports/cucumber-report.html'],
   },
 };
