@@ -26,6 +26,9 @@ jobs:
       - name: Installation des navigateurs Playwright
         run: npx playwright install --with-deps chromium
 
+      - name: Scenarios BDD executes dans le navigateur (Cucumber + Playwright)
+        run: npm run test:bdd:ui
+
       - name: Tests de bout en bout (E2E - Playwright)
         run: npm run test:e2e
 

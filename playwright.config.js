@@ -6,12 +6,12 @@ export default defineConfig({
   // Terminal + rapport HTML (playwright-report/index.html)
   reporter: [['list'], ['html', { open: 'never' }]],
   webServer: {
-    command: 'npx http-server . -p 4173 -s',
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
+    command: 'npx http-server . -p 4190 -s',
+    port: 4190,
+    reuseExistingServer: false,
   },
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: 'http://localhost:4190',
     // Capture d'ecran + trace (actions, DOM, reseau) consultables dans le rapport
     screenshot: 'on',
     trace: 'on',
