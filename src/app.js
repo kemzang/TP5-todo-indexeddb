@@ -183,14 +183,25 @@ function renderProjects() {
   els.projectsEmpty.hidden = state.projects.length > 0;
 }
 
+// N'ecrit le titre de l'onglet que s'il change (evite des ecritures inutiles a chaque rendu).
+function setTitle(title) {
+  if (document.title !== title) document.title = title;
+}
+
 function renderTasks() {
   const project = state.projects.find((p) => p.id === state.currentProjectId);
   els.noProject.hidden = Boolean(project);
   els.projectView.hidden = !project;
-  if (!project) return;
+  if (!project) {
+    // Vider la liste : sinon les anciennes taches (et leurs ecouteurs) restent
+    // en memoire dans la zone masquee. Defaut detecte par le profilage memoire.
+    els.taskList.replaceChildren();
+    setTitle('Mes tâches');
+    return;
+  }
 
   els.projectTitle.textContent = project.name;
-  document.title = `${project.name} · Mes tâches`;
+  setTitle(`${project.name} · Mes tâches`);
 
   const total = state.tasks.length;
   const done = state.tasks.filter((t) => t.done).length;

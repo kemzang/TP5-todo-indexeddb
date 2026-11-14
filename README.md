@@ -27,7 +27,7 @@ projets et persistées dans **IndexedDB**, la base de données native du navigat
   et tâches en suivant les phrases Gherkin.
 - `e2e/` : tests **E2E** (Playwright) dans un vrai navigateur, avec vérification
   de la persistance par rechargement de page.
-- `.github/workflows/ci.yml` : exécute les 4 suites à chaque `push`.
+- `.github/workflows/ci.yml` : exécute les 4 suites à chaque `push`, puis les tests de performance k6.
 
 ## Vrai IndexedDB ou fake-indexeddb ?
 
@@ -68,6 +68,40 @@ npm run demo
 Une fenêtre Chromium s'ouvre et le robot exécute les scénarios de
 `features/navigateur/` au ralenti, pendant que le terminal affiche chaque étape
 Gherkin.
+
+## Tests de performance (k6)
+
+```bash
+npm run perf:charge      # charge HTTP : 0 → 50 utilisateurs virtuels (montée, palier, descente)
+npm run perf:navigateur  # k6 pilote Chromium : 50 tâches ajoutées, rechargement, suppression
+npm run perf             # les deux
+npm run report:perf      # ouvre les rapports HTML k6
+```
+
+- `perf/charge.js` : seuils `p(95)<300ms`, `p(99)<800ms`, moins de 1 % d'erreurs.
+  L'application n'ayant pas d'API (données dans IndexedDB, côté navigateur), la charge
+  porte sur le service des fichiers statiques.
+- `perf/navigateur.js` : seuils sur les Web Vitals (FCP, LCP, CLS), sur le temps d'ajout
+  d'une tâche (mesuré dans la page) et sur le rechargement d'un projet de 50 tâches.
+- Un seuil violé fait échouer k6 (code de sortie non nul), donc la CI.
+- En local, k6 tourne dans l'image Docker officielle `grafana/k6:latest-with-browser`
+  (Chromium inclus). Avec un k6 installé localement : `K6_MODE=local npm run perf`.
+
+## Profilage (CPU, mémoire)
+
+```bash
+npm run profil           # le robot utilise l'appli pendant que Chrome enregistre un profil
+npm run profil:visible   # idem, en voyant le navigateur
+```
+
+- `reports/profil-performance.json` : à ouvrir dans Chrome, F12 > **Performance** >
+  « Charger le profil ». On y retrouve CPU (Scripting, Rendering, Painting),
+  mémoire (JS heap, nœuds, écouteurs), captures d'écran et arbre d'appels.
+- Détection de fuite mémoire : 6 cycles (créer un projet, 20 tâches, supprimer) dans la
+  même page ; mémoire JS, écouteurs et éléments du DOM doivent rester stables, et aucune
+  tâche ne doit rester dans la zone masquée. Sinon le script échoue (code 1), donc la CI.
+- Ce test a détecté un vrai défaut, corrigé depuis : après la suppression d'un projet,
+  ses tâches restaient dans le DOM masqué avec leurs écouteurs.
 
 ## Rapports HTML
 

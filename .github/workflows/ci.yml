@@ -42,3 +42,44 @@ jobs:
             reports/
             playwright-report/
           retention-days: 7
+
+  # Tests de performance k6 : lances seulement si tous les tests fonctionnels sont verts.
+  # Un seuil (threshold) viole fait echouer k6, donc ce job, donc le pipeline.
+  performance:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      K6_MODE: local # binaire k6 installe ci-dessous ; Chrome est deja present sur le runner
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Test de charge HTTP (k6)
+        run: npm run perf:charge
+
+      - name: Test de performance dans le navigateur (k6 browser)
+        run: npm run perf:navigateur
+
+      - name: Installation de Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+
+      - name: Profilage (CPU, memoire) et detection de fuite memoire
+        run: npm run profil
+
+      - name: Rapports k6 et profil de performance
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rapports-performance
+          path: |
+            reports/k6-*.html
+            reports/profil-*.json
+          retention-days: 7

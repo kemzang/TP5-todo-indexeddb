@@ -11,11 +11,17 @@
     "test:bdd:ui": "cucumber-js -p navigateur",
     "test:e2e": "playwright test",
     "test:all": "npm run test && npm run test:bdd && npm run test:bdd:ui && npm run test:e2e",
+    "perf:charge": "node perf/lancer.mjs charge.js",
+    "perf:navigateur": "node perf/lancer.mjs navigateur.js",
+    "perf": "npm run perf:charge && npm run perf:navigateur",
+    "profil": "node perf/profilage.mjs",
+    "profil:visible": "node perf/profilage.mjs --visible",
     "demo": "cucumber-js -p demo",
     "report:unit": "vite preview --outDir reports/vitest --port 4300 --open",
     "report:bdd": "xdg-open reports/cucumber-report.html",
     "report:bdd:ui": "xdg-open reports/cucumber-navigateur.html",
-    "report:e2e": "playwright show-report"
+    "report:e2e": "playwright show-report",
+    "report:perf": "xdg-open reports/k6-charge.html && xdg-open reports/k6-navigateur.html"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^11.2.0",
