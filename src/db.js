@@ -52,10 +52,20 @@ export function openDatabase() {
 
 /* ---------- Projets ---------- */
 
-export async function addProject(db, name) {
+function cleanDescription(description) {
+  return typeof description === 'string' ? description.trim() : '';
+}
+
+export async function addProject(db, name, description = '') {
   const cleanName = requireText(name, 'Le nom du projet est requis');
   const tx = db.transaction('projects', 'readwrite');
-  const id = await promisify(tx.objectStore('projects').add({ name: cleanName }));
+  const id = await promisify(
+    tx.objectStore('projects').add({
+      name: cleanName,
+      description: cleanDescription(description),
+      createdAt: Date.now(),
+    }),
+  );
   await transactionDone(tx);
   return id;
 }
@@ -63,6 +73,29 @@ export async function addProject(db, name) {
 export function getProjects(db) {
   const tx = db.transaction('projects', 'readonly');
   return promisify(tx.objectStore('projects').getAll());
+}
+
+// Modifie le nom et/ou la description d'un projet (lecture + ecriture atomiques).
+export async function updateProject(db, id, changes) {
+  const patch = {};
+  if ('name' in changes) patch.name = requireText(changes.name, 'Le nom du projet est requis');
+  if ('description' in changes) patch.description = cleanDescription(changes.description);
+
+  const tx = db.transaction('projects', 'readwrite');
+  const done = transactionDone(tx);
+  const store = tx.objectStore('projects');
+
+  const existing = await promisify(store.get(id));
+  if (!existing) {
+    tx.abort();
+    await done.catch(() => {});
+    throw new Error('Projet introuvable : ' + id);
+  }
+
+  const updated = { ...existing, ...patch, id, updatedAt: Date.now() };
+  store.put(updated);
+  await done;
+  return updated;
 }
 
 // Supprime un projet ET toutes ses taches dans une seule transaction :
@@ -151,7 +184,7 @@ export async function updateTask(db, id, changes) {
     throw new Error('Tache introuvable : ' + id);
   }
 
-  const updated = { ...existing, ...patch, id };
+  const updated = { ...existing, ...patch, id, updatedAt: Date.now() };
   store.put(updated);
   await done;
   return updated;

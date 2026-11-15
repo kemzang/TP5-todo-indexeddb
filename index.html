@@ -16,6 +16,10 @@
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z M13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></g></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></g></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></g></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-db" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></g></symbol>
   </svg>
 
@@ -54,14 +58,24 @@
 
       <section id="project-view" class="project-view" hidden>
         <header class="project-header">
-          <div>
+          <div class="project-heading">
             <p class="eyebrow">Projet</p>
             <h1 id="project-title" data-testid="project-title"></h1>
+            <p id="project-description" class="project-description" data-testid="project-description" hidden></p>
+            <p class="project-meta">
+              <span class="meta-item"><svg aria-hidden="true"><use href="#i-calendar"/></svg><span id="project-created" data-testid="project-created"></span></span>
+            </p>
           </div>
-          <button id="delete-project" type="button" class="btn btn-ghost btn-danger-text" data-testid="delete-project">
-            <svg aria-hidden="true"><use href="#i-trash"/></svg>
-            Supprimer le projet
-          </button>
+          <div class="project-actions">
+            <button id="edit-project" type="button" class="btn btn-secondary" data-testid="edit-project">
+              <svg aria-hidden="true"><use href="#i-edit"/></svg>
+              Modifier
+            </button>
+            <button id="delete-project" type="button" class="btn btn-ghost btn-danger-text" data-testid="delete-project">
+              <svg aria-hidden="true"><use href="#i-trash"/></svg>
+              Supprimer le projet
+            </button>
+          </div>
         </header>
 
         <div class="progress" aria-live="polite">
@@ -79,10 +93,33 @@
         </form>
         <p id="task-error" class="form-error" role="alert" data-testid="task-error" hidden></p>
 
+        <!-- Filtres, recherche et tri (appliqués à l'affichage, sans modifier la base) -->
+        <div class="toolbar">
+          <div class="tabs" role="tablist" aria-label="Filtrer les tâches">
+            <button type="button" role="tab" class="tab" data-filter="all" data-testid="filter-all" aria-selected="true">Toutes <span class="tab-count" data-count="all">0</span></button>
+            <button type="button" role="tab" class="tab" data-filter="todo" data-testid="filter-todo" aria-selected="false">En attente <span class="tab-count" data-count="todo">0</span></button>
+            <button type="button" role="tab" class="tab" data-filter="done" data-testid="filter-done" aria-selected="false">Terminées <span class="tab-count" data-count="done">0</span></button>
+          </div>
+          <div class="toolbar-row">
+            <label class="search">
+              <svg aria-hidden="true"><use href="#i-search"/></svg>
+              <span class="visually-hidden">Rechercher une tâche</span>
+              <input id="task-search" type="search" placeholder="Rechercher…" autocomplete="off" data-testid="task-search">
+            </label>
+            <label class="sort">
+              <span class="visually-hidden">Trier les tâches</span>
+              <svg aria-hidden="true"><use href="#i-sort"/></svg>
+              <select id="task-sort" data-testid="task-sort">
+                <option value="recent">Plus récentes</option>
+                <option value="oldest">Plus anciennes</option>
+                <option value="alpha">Ordre alphabétique</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
         <ul id="task-list" class="task-list" data-testid="task-list"></ul>
-        <p id="empty-state" class="empty-state" data-testid="empty-state" hidden>
-          Aucune tâche dans ce projet. Ajoutez la première ci-dessus.
-        </p>
+        <p id="empty-state" class="empty-state" data-testid="empty-state" hidden></p>
       </section>
     </main>
   </div>
@@ -95,6 +132,26 @@
       <div class="dialog-actions">
         <button value="cancel" class="btn btn-secondary" data-testid="confirm-cancel">Annuler</button>
         <button value="confirm" class="btn btn-danger" data-testid="confirm-ok">Supprimer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modification d'un projet -->
+  <dialog id="project-dialog" class="dialog" data-testid="project-dialog" aria-labelledby="project-dialog-title">
+    <form id="project-edit-form" method="dialog" novalidate>
+      <h2 id="project-dialog-title" class="dialog-title">Modifier le projet</h2>
+      <label class="field">
+        <span class="field-label">Nom</span>
+        <input id="project-edit-name" type="text" maxlength="60" autocomplete="off" data-testid="project-edit-name">
+      </label>
+      <label class="field">
+        <span class="field-label">Description <span class="field-hint">(facultative)</span></span>
+        <textarea id="project-edit-description" rows="3" maxlength="300" data-testid="project-edit-description"></textarea>
+      </label>
+      <p id="project-edit-error" class="form-error" role="alert" data-testid="project-edit-error" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" value="cancel" class="btn btn-secondary" data-testid="project-edit-cancel">Annuler</button>
+        <button type="submit" value="save" class="btn btn-primary" data-testid="project-edit-save">Enregistrer</button>
       </div>
     </form>
   </dialog>

@@ -9,6 +9,11 @@ projets et persistées dans **IndexedDB**, la base de données native du navigat
   supprime aussi ses tâches, dans une seule transaction, après confirmation).
 - Ajouter, renommer (édition en ligne : Entrée pour valider, Échap pour annuler),
   cocher/décocher et supprimer des tâches.
+- Description de projet et modification du nom/de la description.
+- Dates de création (projets, tâches) et de dernière modification (tâches), statut
+  « En attente » / « Terminée ».
+- Filtres Toutes / En attente / Terminées avec compteurs, recherche (insensible à la
+  casse et aux accents) et tri (plus récentes, plus anciennes, alphabétique).
 - Progression par projet, compteur de tâches restantes.
 - Messages d'erreur visibles (saisie vide ou faite d'espaces, nom de projet en double,
   erreur de base de données) : aucune erreur silencieuse.
@@ -52,10 +57,10 @@ npx playwright install chromium
 ## Lancer les tests
 
 ```bash
-npm run test         # TDD - Vitest (21 tests)
+npm run test         # TDD - Vitest (26 tests)
 npm run test:bdd     # BDD - Cucumber.js sur la couche données (8 scénarios)
-npm run test:bdd:ui  # BDD - Cucumber.js piloté dans Chromium (11 scénarios)
-npm run test:e2e     # E2E - Playwright (9 tests, vrai navigateur)
+npm run test:bdd:ui  # BDD - Cucumber.js piloté dans Chromium (14 scénarios)
+npm run test:e2e     # E2E - Playwright (12 tests, vrai navigateur)
 npm run test:all     # toutes les suites
 ```
 

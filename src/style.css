@@ -414,7 +414,7 @@ input[aria-invalid='true'] {
    ========================================================= */
 .project-header {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.5rem;
@@ -682,6 +682,277 @@ input[aria-invalid='true'] {
 }
 
 /* =========================================================
+   Détails du projet, barre d'outils, métadonnées des tâches
+   ========================================================= */
+:root {
+  --warning: #b54708;
+  --warning-soft: #fffaeb;
+  --success-text: #067647;
+  --success-soft: #ecfdf3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --warning: #fdb022;
+    --warning-soft: rgba(253, 176, 34, 0.12);
+    --success-text: #47cd89;
+    --success-soft: rgba(71, 205, 137, 0.12);
+  }
+}
+
+.project-heading {
+  min-width: 0;
+}
+
+.project-description {
+  margin-top: 0.35rem;
+  color: var(--text-2);
+  font-size: 0.95rem;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.project-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin-top: 0.6rem;
+}
+
+.project-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.meta-item svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Barre d'outils : onglets + recherche + tri */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.toolbar-row {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 260px;
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 32px;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab[aria-selected='true'] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
+}
+
+.tab-count {
+  min-width: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text-2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab[aria-selected='true'] .tab-count {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.search,
+.sort {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search {
+  flex: 1;
+  max-width: 280px;
+}
+
+.search svg,
+.sort svg {
+  position: absolute;
+  left: 0.65rem;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.search input,
+.sort select {
+  width: 100%;
+  height: 36px;
+  padding: 0 0.75rem 0 2.1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.sort select {
+  padding-right: 0.5rem;
+  cursor: pointer;
+}
+
+.search input:focus,
+.sort select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--focus);
+}
+
+/* Contenu d'une tâche : titre + métadonnées */
+.task-item {
+  align-items: flex-start;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+}
+
+.task-item .task-checkbox {
+  margin-top: 2px;
+}
+
+.task-item.editing {
+  align-items: center;
+}
+
+.task-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.9rem;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.status-chip.is-done {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.status-chip.is-todo {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+/* Formulaire de la boîte de dialogue */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 1rem;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.field-hint {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.field input[type='text'] {
+  flex: none;
+}
+
+.field textarea {
+  min-height: 80px;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  resize: vertical;
+}
+
+.field textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--focus);
+}
+
+.dialog .form-error {
+  margin-top: 0.5rem;
+}
+
+/* =========================================================
    Responsive : la barre latérale passe au-dessus sur mobile
    ========================================================= */
 @media (max-width: 760px) {
@@ -709,8 +980,19 @@ input[aria-invalid='true'] {
     font-size: 1.5rem;
   }
 
-  .project-header .btn {
-    margin-left: -0.6rem;
-    padding: 0 0.6rem;
+  .project-actions {
+    width: 100%;
+  }
+
+  .project-actions .btn {
+    flex: 1;
+  }
+
+  .toolbar-row {
+    min-width: 100%;
+  }
+
+  .search {
+    max-width: none;
   }
 }

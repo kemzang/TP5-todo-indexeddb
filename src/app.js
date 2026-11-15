@@ -4,6 +4,7 @@ import {
   addProject,
   getProjects,
   deleteProject,
+  updateProject,
   addTask,
   getTasksByProject,
   updateTask,
@@ -21,6 +22,9 @@ const els = {
   noProject: $('no-project'),
   projectView: $('project-view'),
   projectTitle: $('project-title'),
+  projectDescription: $('project-description'),
+  projectCreated: $('project-created'),
+  editProjectBtn: $('edit-project'),
   deleteProjectBtn: $('delete-project'),
   progressFill: $('progress-fill'),
   progressLabel: $('progress-label'),
@@ -29,6 +33,16 @@ const els = {
   taskError: $('task-error'),
   taskList: $('task-list'),
   emptyState: $('empty-state'),
+  tabs: document.querySelectorAll('.tab[data-filter]'),
+  tabCounts: document.querySelectorAll('.tab-count[data-count]'),
+  search: $('task-search'),
+  sort: $('task-sort'),
+  projectDialog: $('project-dialog'),
+  projectEditForm: $('project-edit-form'),
+  projectEditName: $('project-edit-name'),
+  projectEditDescription: $('project-edit-description'),
+  projectEditError: $('project-edit-error'),
+  projectEditCancel: document.querySelector('[data-testid="project-edit-cancel"]'),
   dialog: $('confirm-dialog'),
   dialogTitle: $('confirm-title'),
   dialogMessage: $('confirm-message'),
@@ -43,6 +57,10 @@ const state = {
   currentProjectId: null,
   tasks: [],
   editingTaskId: null,
+  // Affichage uniquement (la base n'est pas modifiee) :
+  filter: 'all', // all | todo | done
+  search: '',
+  sort: 'recent', // recent | oldest | alpha
 };
 
 // Seule preference d'affichage gardee hors IndexedDB : le dernier projet ouvert.
@@ -111,6 +129,24 @@ function plural(n, word) {
   return `${n} ${word}${n > 1 ? 's' : ''}`;
 }
 
+const formatDate = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+const formatHeure = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const dateCourte = (ts) => formatDate.format(ts);
+const dateHeure = (ts) => `${formatDate.format(ts)} à ${formatHeure.format(ts)}`;
+
+// Recherche insensible a la casse et aux accents ("tache" trouve "Tâche").
+const normaliser = (texte) => texte.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+function metaItem(icon, text) {
+  const span = document.createElement('span');
+  span.className = 'meta-item';
+  span.innerHTML = `<svg aria-hidden="true"><use href="#${icon}"/></svg>`;
+  const label = document.createElement('span');
+  label.textContent = text;
+  span.append(label);
+  return span;
+}
+
 /* =========================================================
    Chargement depuis IndexedDB
    ========================================================= */
@@ -134,7 +170,7 @@ async function loadTasks() {
   state.tasks =
     state.currentProjectId == null
       ? []
-      : (await getTasksByProject(state.db, state.currentProjectId)).sort((a, b) => a.createdAt - b.createdAt);
+      : await getTasksByProject(state.db, state.currentProjectId);
 }
 
 async function reload() {
@@ -201,6 +237,10 @@ function renderTasks() {
   }
 
   els.projectTitle.textContent = project.name;
+  els.projectDescription.textContent = project.description || '';
+  els.projectDescription.hidden = !project.description;
+  els.projectCreated.textContent = project.createdAt ? `Créé le ${dateCourte(project.createdAt)}` : '';
+  els.projectCreated.parentElement.hidden = !project.createdAt;
   setTitle(`${project.name} · Mes tâches`);
 
   const total = state.tasks.length;
@@ -208,8 +248,35 @@ function renderTasks() {
   els.progressFill.style.width = total ? `${(done / total) * 100}%` : '0';
   els.progressLabel.textContent = total ? `${done} / ${total} terminée${done > 1 ? 's' : ''}` : 'Aucune tâche';
 
-  els.taskList.replaceChildren(...state.tasks.map(renderTask));
-  els.emptyState.hidden = total > 0;
+  // Compteurs des onglets
+  const counts = { all: total, todo: total - done, done };
+  els.tabCounts.forEach((el) => (el.textContent = counts[el.dataset.count]));
+  els.tabs.forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.filter === state.filter)));
+
+  const visibles = visibleTasks();
+  els.taskList.replaceChildren(...visibles.map(renderTask));
+  els.emptyState.hidden = visibles.length > 0;
+  els.emptyState.textContent = !total
+    ? 'Aucune tâche dans ce projet. Ajoutez la première ci-dessus.'
+    : state.search.trim()
+      ? `Aucune tâche ne correspond à « ${state.search.trim()} ».`
+      : state.filter === 'done'
+        ? 'Aucune tâche terminée pour le moment.'
+        : 'Toutes les tâches sont terminées. Bravo !';
+}
+
+// Filtre (onglet), recherche et tri : appliques a l'affichage uniquement.
+function visibleTasks() {
+  const recherche = normaliser(state.search.trim());
+  const tri = {
+    recent: (a, b) => b.createdAt - a.createdAt || b.id - a.id,
+    oldest: (a, b) => a.createdAt - b.createdAt || a.id - b.id,
+    alpha: (a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }),
+  }[state.sort];
+  return state.tasks
+    .filter((t) => (state.filter === 'todo' ? !t.done : state.filter === 'done' ? t.done : true))
+    .filter((t) => !recherche || normaliser(t.title).includes(recherche))
+    .sort(tri);
 }
 
 function iconButton(icon, label, extraClass = '') {
@@ -246,10 +313,25 @@ function renderTask(task) {
     }),
   );
 
+  const body = document.createElement('div');
+  body.className = 'task-body';
+
   const title = document.createElement('span');
   title.className = 'task-title';
   title.textContent = task.title;
   title.addEventListener('dblclick', () => startEditing(task.id));
+
+  const meta = document.createElement('div');
+  meta.className = 'task-meta';
+  meta.append(metaItem('i-calendar', `Créée le ${dateCourte(task.createdAt)}`));
+  if (task.updatedAt) meta.append(metaItem('i-clock', `Modifiée le ${dateHeure(task.updatedAt)}`));
+
+  const status = document.createElement('span');
+  status.className = `status-chip ${task.done ? 'is-done' : 'is-todo'}`;
+  status.textContent = task.done ? 'Terminée' : 'En attente';
+  meta.append(status);
+
+  body.append(title, meta);
 
   const actions = document.createElement('div');
   actions.className = 'task-actions';
@@ -267,7 +349,7 @@ function renderTask(task) {
   );
 
   actions.append(editBtn, deleteBtn);
-  li.append(checkbox, title, actions);
+  li.append(checkbox, body, actions);
   return li;
 }
 
@@ -351,6 +433,8 @@ function focusInTask(taskId, selector) {
 async function selectProject(id) {
   state.currentProjectId = id;
   state.editingTaskId = null;
+  state.search = '';
+  els.search.value = '';
   rememberProject(id);
   clearFieldError(els.taskTitle, els.taskError);
   await safely(async () => {
@@ -430,6 +514,61 @@ els.deleteProjectBtn.addEventListener('click', () =>
     toast(`Projet « ${project.name} » supprimé`);
   }),
 );
+
+/* ---------- Filtres, recherche, tri ---------- */
+
+els.tabs.forEach((tab) =>
+  tab.addEventListener('click', () => {
+    state.filter = tab.dataset.filter;
+    state.editingTaskId = null;
+    renderTasks();
+  }),
+);
+
+els.search.addEventListener('input', () => {
+  state.search = els.search.value;
+  renderTasks();
+});
+
+els.sort.addEventListener('change', () => {
+  state.sort = els.sort.value;
+  renderTasks();
+});
+
+/* ---------- Modification du projet (nom, description) ---------- */
+
+els.editProjectBtn.addEventListener('click', () => {
+  const project = state.projects.find((p) => p.id === state.currentProjectId);
+  if (!project) return;
+  els.projectEditName.value = project.name;
+  els.projectEditDescription.value = project.description || '';
+  clearFieldError(els.projectEditName, els.projectEditError);
+  els.projectDialog.showModal();
+  els.projectEditName.select();
+});
+
+els.projectEditCancel.addEventListener('click', () => els.projectDialog.close());
+els.projectEditName.addEventListener('input', () => clearFieldError(els.projectEditName, els.projectEditError));
+
+els.projectEditForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const id = state.currentProjectId;
+  const name = els.projectEditName.value.trim();
+  if (!name) {
+    showFieldError(els.projectEditName, els.projectEditError, 'Donnez un nom au projet.');
+    return;
+  }
+  if (state.projects.some((p) => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) {
+    showFieldError(els.projectEditName, els.projectEditError, 'Un projet porte déjà ce nom.');
+    return;
+  }
+  safely(async () => {
+    await updateProject(state.db, id, { name, description: els.projectEditDescription.value });
+    els.projectDialog.close();
+    await reload();
+    toast('Projet modifié');
+  });
+});
 
 /* =========================================================
    Demarrage

@@ -157,3 +157,74 @@ test('affiche un message clair pour une saisie vide ou faite uniquement d\'espac
   await expect(page.getByTestId('task-error')).toHaveText('Saisissez un titre pour la tâche.');
   await expect(page.getByTestId('task-list').locator('li')).toHaveCount(0);
 });
+
+test('modifier le nom et la description du projet', async ({ page }) => {
+  await creerProjet(page, 'Brouillon');
+
+  await page.getByTestId('edit-project').click();
+  await page.getByTestId('project-edit-name').fill('INF563');
+  await page.getByTestId('project-edit-description').fill('Vérification et validation logicielle');
+  await page.getByTestId('project-edit-save').click();
+
+  await expect(page.getByTestId('project-title')).toHaveText('INF563');
+  await expect(page.getByTestId('project-description')).toHaveText('Vérification et validation logicielle');
+  await expect(projet(page, 'INF563')).toBeVisible();
+
+  // Un nom vide est refusé, la fenêtre reste ouverte
+  await page.getByTestId('edit-project').click();
+  await page.getByTestId('project-edit-name').fill('   ');
+  await page.getByTestId('project-edit-save').click();
+  await expect(page.getByTestId('project-edit-error')).toHaveText('Donnez un nom au projet.');
+  await page.getByTestId('project-edit-cancel').click();
+
+  await page.reload();
+  await expect(page.getByTestId('project-title')).toHaveText('INF563');
+  await expect(page.getByTestId('project-description')).toHaveText('Vérification et validation logicielle');
+});
+
+test('affiche les dates de creation et de modification', async ({ page }) => {
+  await creerProjet(page, 'Dates');
+  await expect(page.getByTestId('project-created')).toHaveText(/^Créé le \d{1,2} \S+ \d{4}$/);
+
+  await creerTache(page, 'Tache datee');
+  await expect(tache(page, 'Tache datee')).toContainText(/Créée le \d{1,2} \S+ \d{4}/);
+  await expect(tache(page, 'Tache datee')).not.toContainText('Modifiée');
+  await expect(tache(page, 'Tache datee')).toContainText('En attente');
+
+  await tache(page, 'Tache datee').getByRole('checkbox').check();
+  await expect(tache(page, 'Tache datee')).toContainText(/Modifiée le .+ à \d{2}:\d{2}/);
+  await expect(tache(page, 'Tache datee')).toContainText('Terminée');
+});
+
+test('filtrer par statut, rechercher et trier les taches', async ({ page }) => {
+  await creerProjet(page, 'Filtres');
+  for (const titre of ['Banane', 'Ananas', 'Cerise']) await creerTache(page, titre);
+  await tache(page, 'Ananas').getByRole('checkbox').check();
+  await expect(tache(page, 'Ananas')).toHaveClass(/done/);
+
+  // Compteurs des onglets
+  await expect(page.getByTestId('filter-all')).toContainText('3');
+  await expect(page.getByTestId('filter-todo')).toContainText('2');
+  await expect(page.getByTestId('filter-done')).toContainText('1');
+
+  const titres = () => page.getByTestId('task-list').locator('.task-title');
+
+  await page.getByTestId('filter-todo').click();
+  await expect(titres()).toHaveText(['Cerise', 'Banane']); // plus récentes d'abord
+
+  await page.getByTestId('filter-done').click();
+  await expect(titres()).toHaveText(['Ananas']);
+
+  await page.getByTestId('filter-all').click();
+  await page.getByTestId('task-sort').selectOption('alpha');
+  await expect(titres()).toHaveText(['Ananas', 'Banane', 'Cerise']);
+  await page.getByTestId('task-sort').selectOption('oldest');
+  await expect(titres()).toHaveText(['Banane', 'Ananas', 'Cerise']);
+
+  // Recherche insensible à la casse et aux accents
+  await page.getByTestId('task-search').fill('CÉR');
+  await expect(titres()).toHaveText(['Cerise']);
+  await page.getByTestId('task-search').fill('kiwi');
+  await expect(titres()).toHaveCount(0);
+  await expect(page.getByTestId('empty-state')).toHaveText('Aucune tâche ne correspond à « kiwi ».');
+});

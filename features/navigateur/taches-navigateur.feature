@@ -74,6 +74,40 @@ Fonctionnalité: Gestion des tâches dans le navigateur
     Quand je sélectionne le projet "Projet A"
     Alors je vois la tâche "Tâche de A"
 
+  Scénario: Modifier le nom et la description d'un projet
+    Quand je crée le projet "Brouillon"
+    Et je modifie le projet avec le nom "INF563" et la description "Vérification et validation logicielle"
+    Alors le projet actif est "INF563"
+    Et la description du projet est "Vérification et validation logicielle"
+    Quand je recharge la page
+    Alors le projet actif est "INF563"
+    Et la description du projet est "Vérification et validation logicielle"
+
+  Scénario: Filtrer les tâches par statut et les rechercher
+    Quand je crée le projet "Cours"
+    Et j'ajoute la tâche "Lire le cours sur k6"
+    Et j'ajoute la tâche "Écrire les scénarios"
+    Et j'ajoute la tâche "Configurer la CI"
+    Et je coche la tâche "Configurer la CI"
+    Et je choisis le filtre "Terminées"
+    Alors je vois 1 tâche dans la liste
+    Et je vois la tâche "Configurer la CI"
+    Quand je choisis le filtre "En attente"
+    Alors je vois 2 tâches dans la liste
+    Quand je choisis le filtre "Toutes"
+    Et je recherche "ecrire"
+    Alors je vois 1 tâche dans la liste
+    Et je vois la tâche "Écrire les scénarios"
+
+  Scénario: Les dates de création et de modification sont affichées
+    Quand je crée le projet "Dates"
+    Et j'ajoute la tâche "Tâche datée"
+    Alors la tâche "Tâche datée" affiche sa date de création
+    Et la tâche "Tâche datée" a le statut "En attente"
+    Quand je coche la tâche "Tâche datée"
+    Alors la tâche "Tâche datée" affiche sa date de modification
+    Et la tâche "Tâche datée" a le statut "Terminée"
+
   Plan du scénario: Refuser une saisie invalide
     Quand je crée le projet "Maison"
     Et je saisis le texte "<saisie>" dans le champ <champ> et je valide

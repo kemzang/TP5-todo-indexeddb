@@ -133,7 +133,42 @@ When('je saisis le texte {string} dans le champ {word} et je valide', async func
   await testId(this, bouton).click();
 });
 
+When('je modifie le projet avec le nom {string} et la description {string}', async function (nom, description) {
+  await testId(this, 'edit-project').click();
+  await saisir(this, testId(this, 'project-edit-name'), nom);
+  await saisir(this, testId(this, 'project-edit-description'), description);
+  await testId(this, 'project-edit-save').click();
+  await expect(testId(this, 'project-dialog')).toBeHidden();
+});
+
+When('je choisis le filtre {string}', async function (nom) {
+  const filtre = { Toutes: 'filter-all', 'En attente': 'filter-todo', Terminées: 'filter-done' }[nom];
+  await testId(this, filtre).click();
+  await expect(testId(this, filtre)).toHaveAttribute('aria-selected', 'true');
+});
+
+When('je recherche {string}', async function (texte) {
+  await saisir(this, testId(this, 'task-search'), texte);
+});
+
 /* ---------- Alors ---------- */
+
+Then('la description du projet est {string}', async function (description) {
+  await expect(testId(this, 'project-description')).toHaveText(description);
+});
+
+Then('la tâche {string} affiche sa date de création', async function (titre) {
+  await expect(ligneTache(this, titre)).toContainText(/Créée le \d{1,2} \S+ \d{4}/);
+});
+
+Then('la tâche {string} affiche sa date de modification', async function (titre) {
+  await expect(ligneTache(this, titre)).toContainText(/Modifiée le .+ à \d{2}:\d{2}/);
+});
+
+Then('la tâche {string} a le statut {string}', async function (titre, statut) {
+  await expect(ligneTache(this, titre).locator('.status-chip')).toHaveText(statut);
+});
+
 
 Then('le projet actif est {string}', async function (nom) {
   await expect(testId(this, 'project-title')).toHaveText(nom);

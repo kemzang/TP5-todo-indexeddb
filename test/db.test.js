@@ -8,6 +8,7 @@ import {
   addProject,
   getProjects,
   deleteProject,
+  updateProject,
   addTask,
   getTask,
   getTasksByProject,
@@ -67,6 +68,34 @@ describe('projets', () => {
   it("rejette la suppression d'un projet inexistant", async () => {
     await expect(deleteProject(db, 999)).rejects.toThrow('Projet introuvable');
   });
+
+  it('enregistre la date de creation et une description facultative', async () => {
+    const avant = Date.now();
+    await addProject(db, 'Cours', '  Devoirs du semestre ');
+    await addProject(db, 'Sans description');
+    const [cours, sans] = await getProjects(db);
+    expect(cours.description).toBe('Devoirs du semestre');
+    expect(cours.createdAt).toBeGreaterThanOrEqual(avant);
+    expect(sans.description).toBe('');
+  });
+
+  it('modifie le nom et la description d\'un projet', async () => {
+    const id = await addProject(db, 'Brouillon');
+    const updated = await updateProject(db, id, { name: ' Final ', description: 'Rendu le 20' });
+    expect(updated).toMatchObject({ id, name: 'Final', description: 'Rendu le 20' });
+    expect(typeof updated.updatedAt).toBe('number');
+    expect((await getProjects(db))[0].name).toBe('Final');
+  });
+
+  it('refuse de renommer un projet avec un nom vide', async () => {
+    const id = await addProject(db, 'Garde son nom');
+    await expect(updateProject(db, id, { name: '   ' })).rejects.toThrow('Le nom du projet est requis');
+    expect((await getProjects(db))[0].name).toBe('Garde son nom');
+  });
+
+  it("rejette la modification d'un projet inexistant", async () => {
+    await expect(updateProject(db, 999, { name: 'x' })).rejects.toThrow('Projet introuvable');
+  });
 });
 
 describe('taches', () => {
@@ -103,6 +132,15 @@ describe('taches', () => {
     const taskId = await addTask(db, { title: 'Brouillon', projectId });
     await updateTask(db, taskId, { title: '  Version finale ' });
     expect((await getTask(db, taskId)).title).toBe('Version finale');
+  });
+
+  it('enregistre la date de modification, sans toucher a la date de creation', async () => {
+    const taskId = await addTask(db, { title: 'Datee', projectId });
+    const creee = await getTask(db, taskId);
+    expect(creee.updatedAt).toBeUndefined();
+    const modifiee = await updateTask(db, taskId, { done: true });
+    expect(modifiee.createdAt).toBe(creee.createdAt);
+    expect(modifiee.updatedAt).toBeGreaterThanOrEqual(creee.createdAt);
   });
 
   it('refuse de renommer une tache avec un titre vide', async () => {
