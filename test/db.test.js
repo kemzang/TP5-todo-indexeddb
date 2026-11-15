@@ -69,6 +69,13 @@ describe('projets', () => {
     await expect(deleteProject(db, 999)).rejects.toThrow('Projet introuvable');
   });
 
+  it("ignore une description qui n'est pas du texte", async () => {
+    const id = await addProject(db, 'Projet', null);
+    expect((await getProjects(db))[0].description).toBe('');
+    await updateProject(db, id, { description: 42 });
+    expect((await getProjects(db))[0].description).toBe('');
+  });
+
   it('enregistre la date de creation et une description facultative', async () => {
     const avant = Date.now();
     await addProject(db, 'Cours', '  Devoirs du semestre ');
@@ -85,6 +92,12 @@ describe('projets', () => {
     expect(updated).toMatchObject({ id, name: 'Final', description: 'Rendu le 20' });
     expect(typeof updated.updatedAt).toBe('number');
     expect((await getProjects(db))[0].name).toBe('Final');
+  });
+
+  it('renommer un projet conserve sa description', async () => {
+    const id = await addProject(db, 'Cours', 'Ma description');
+    await updateProject(db, id, { name: 'Cours renomme' });
+    expect((await getProjects(db))[0]).toMatchObject({ name: 'Cours renomme', description: 'Ma description' });
   });
 
   it('refuse de renommer un projet avec un nom vide', async () => {
@@ -145,7 +158,7 @@ describe('taches', () => {
 
   it('refuse de renommer une tache avec un titre vide', async () => {
     const taskId = await addTask(db, { title: 'Brouillon', projectId });
-    await expect(updateTask(db, taskId, { title: '  ' })).rejects.toThrow();
+    await expect(updateTask(db, taskId, { title: '  ' })).rejects.toThrow('Le titre de la tache est requis');
     expect((await getTask(db, taskId)).title).toBe('Brouillon');
   });
 
@@ -155,6 +168,19 @@ describe('taches', () => {
     expect(await getTask(db, taskId)).toMatchObject({ title: 'A faire', done: true, projectId });
     await updateTask(db, taskId, { done: false });
     expect((await getTask(db, taskId)).done).toBe(false);
+  });
+
+  it('renommer une tache terminee la laisse terminee', async () => {
+    const taskId = await addTask(db, { title: 'Faite', projectId });
+    await updateTask(db, taskId, { done: true });
+    await updateTask(db, taskId, { title: 'Faite et renommee' });
+    expect(await getTask(db, taskId)).toMatchObject({ title: 'Faite et renommee', done: true });
+  });
+
+  it('enregistre toujours un booleen pour done', async () => {
+    const taskId = await addTask(db, { title: 'Booleen', projectId });
+    expect((await updateTask(db, taskId, { done: 1 })).done).toBe(true);
+    expect((await updateTask(db, taskId, { done: '' })).done).toBe(false);
   });
 
   it("ne permet pas de changer l'id ni le projet via updateTask", async () => {
@@ -188,5 +214,96 @@ describe('taches', () => {
     const tasksB = await getTasksByProject(db, autre);
     expect(tasksA.map((t) => t.title)).toEqual(['Tache A']);
     expect(tasksB.map((t) => t.title)).toEqual(['Tache B']);
+  });
+});
+
+describe("erreurs d'IndexedDB", () => {
+  it("rejette l'ouverture si la base existe deja dans une version plus recente", async () => {
+    db.close();
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('todo-app', 99);
+      request.onsuccess = () => {
+        request.result.close();
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+    await expect(openDatabase()).rejects.toMatchObject({ name: 'VersionError' });
+    db = { close() {} }; // la base d'origine est deja fermee (afterEach)
+  });
+
+  // Fausse base : chaque requete reussit (avec la valeur `resultats[methode]`),
+  // sauf `methodeEnEchec`, qui echoue comme le ferait IndexedDB (disque plein, etc.).
+  function baseQuiEchoue(methodeEnEchec, resultats = {}, { annuler = false } = {}) {
+    const erreur = new DOMException('Quota de stockage depasse', 'QuotaExceededError');
+    const tx = { abort() {}, objectStore: () => store };
+    let enCours = 0;
+    let echec = false;
+    const requete = (methode) => () => {
+      const req = {};
+      enCours++;
+      queueMicrotask(() => {
+        enCours--;
+        if (methode === methodeEnEchec) {
+          echec = true;
+          req.error = erreur;
+          req.onerror?.();
+          tx.error = erreur;
+          tx.onerror?.();
+        } else {
+          req.result = resultats[methode];
+          req.onsuccess?.();
+          // Comme IndexedDB : la transaction n'est validee que lorsqu'aucune requete n'est en cours.
+          setTimeout(() => {
+            if (echec || enCours !== 0) return;
+            if (annuler === 'avec-erreur') {
+              tx.error = erreur; // ex. quota depasse au moment de l'enregistrement
+              tx.onabort?.();
+            } else if (annuler) tx.onabort?.(); // annulee sans erreur (ex. page fermee)
+            else tx.oncomplete?.();
+          });
+        }
+      });
+      return req;
+    };
+    const store = {
+      add: requete('add'),
+      get: requete('get'),
+      getAll: requete('getAll'),
+      put: requete('put'),
+      delete: requete('delete'),
+      index: () => ({ getAll: requete('getAll'), getAllKeys: requete('getAllKeys') }),
+    };
+    return { transaction: () => tx };
+  }
+
+  it("propage l'erreur d'une requete qui echoue (lecture)", async () => {
+    await expect(getProjects(baseQuiEchoue('getAll'))).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  });
+
+  it("propage l'erreur d'une requete qui echoue (ecriture)", async () => {
+    await expect(addProject(baseQuiEchoue('add'), 'Maison')).rejects.toMatchObject({
+      name: 'QuotaExceededError',
+    });
+  });
+
+  it("propage l'echec de la transaction lors d'une modification", async () => {
+    const base = baseQuiEchoue('put', { get: { id: 1, title: 'A', projectId: 1, done: false } });
+    await expect(updateTask(base, 1, { done: true })).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  });
+
+  it('rejette si le navigateur annule la transaction', async () => {
+    const base = baseQuiEchoue(null, { get: { id: 1, title: 'A', projectId: 1, done: false } }, { annuler: true });
+    await expect(updateTask(base, 1, { done: true })).rejects.toThrow('Transaction annulee');
+  });
+
+  it("rejette avec l'erreur reelle si la transaction est annulee a cause d'une erreur", async () => {
+    const tache = { id: 1, title: 'A', projectId: 1, done: false };
+    const base = baseQuiEchoue(null, { get: tache }, { annuler: 'avec-erreur' });
+    await expect(updateTask(base, 1, { done: true })).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  });
+
+  it('propage une erreur de lecture sans laisser de rejet non gere', async () => {
+    await expect(deleteTask(baseQuiEchoue('get'), 1)).rejects.toMatchObject({ name: 'QuotaExceededError' });
   });
 });

@@ -15,11 +15,15 @@ function promisify(request) {
 
 // Resout quand la transaction est reellement validee (commit) sur le disque.
 function transactionDone(tx) {
-  return new Promise((resolve, reject) => {
+  const done = new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('Transaction annulee'));
   });
+  // Si une requete echoue avant que l'on attende la transaction, l'erreur est deja
+  // remontee par la requete : on evite un rejet "non gere". Attendre `done` rejette toujours.
+  done.catch(() => {});
+  return done;
 }
 
 function requireText(value, message) {
@@ -33,16 +37,13 @@ export function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    // Appele uniquement a la creation de la base ou lors d'un changement de version.
+    // Version 1 : ce code ne s'execute qu'a la creation de la base, on cree les tables.
+    // (Une future version 2 ajoutera sa migration avec : if (event.oldVersion < 2) { ... })
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains('projects')) {
-        db.createObjectStore('projects', { keyPath: 'id', autoIncrement: true });
-      }
-      if (!db.objectStoreNames.contains('tasks')) {
-        const tasks = db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
-        tasks.createIndex('byProject', 'projectId');
-      }
+      db.createObjectStore('projects', { keyPath: 'id', autoIncrement: true });
+      const tasks = db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
+      tasks.createIndex('byProject', 'projectId');
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -87,8 +88,6 @@ export async function updateProject(db, id, changes) {
 
   const existing = await promisify(store.get(id));
   if (!existing) {
-    tx.abort();
-    await done.catch(() => {});
     throw new Error('Projet introuvable : ' + id);
   }
 
@@ -108,8 +107,6 @@ export async function deleteProject(db, projectId) {
 
   const existing = await promisify(projects.get(projectId));
   if (!existing) {
-    tx.abort();
-    await done.catch(() => {});
     throw new Error('Projet introuvable : ' + projectId);
   }
 
@@ -135,8 +132,6 @@ export async function addTask(db, { title, projectId }) {
 
   const project = await promisify(tx.objectStore('projects').get(projectId));
   if (!project) {
-    tx.abort();
-    await done.catch(() => {});
     throw new Error('Projet introuvable : ' + projectId);
   }
 
@@ -163,6 +158,8 @@ export function getTasksByProject(db, projectId) {
 }
 
 // Lecture + ecriture dans la meme transaction : la mise a jour est atomique.
+// Si l'enregistrement n'existe pas, rien n'a ete ecrit : on leve l'erreur et la
+// transaction se termine sans effet (pas besoin de l'annuler).
 export async function updateTask(db, id, changes) {
   const patch = { ...changes };
   if ('title' in patch) {
@@ -179,8 +176,6 @@ export async function updateTask(db, id, changes) {
 
   const existing = await promisify(store.get(id));
   if (!existing) {
-    tx.abort();
-    await done.catch(() => {});
     throw new Error('Tache introuvable : ' + id);
   }
 
@@ -197,8 +192,6 @@ export async function deleteTask(db, id) {
 
   const existing = await promisify(store.get(id));
   if (!existing) {
-    tx.abort();
-    await done.catch(() => {});
     throw new Error('Tache introuvable : ' + id);
   }
 

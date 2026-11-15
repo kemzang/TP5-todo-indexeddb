@@ -7,6 +7,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:mutation": "stryker run",
     "test:bdd": "cucumber-js",
     "test:bdd:ui": "cucumber-js -p navigateur",
     "test:e2e": "playwright test",
@@ -21,12 +23,17 @@
     "report:bdd": "xdg-open reports/cucumber-report.html",
     "report:bdd:ui": "xdg-open reports/cucumber-navigateur.html",
     "report:e2e": "playwright show-report",
-    "report:perf": "xdg-open reports/k6-charge.html && xdg-open reports/k6-navigateur.html"
+    "report:perf": "xdg-open reports/k6-charge.html && xdg-open reports/k6-navigateur.html",
+    "report:coverage": "xdg-open reports/coverage/index.html",
+    "report:mutation": "xdg-open reports/mutation/index.html"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^11.2.0",
     "@cucumber/pretty-formatter": "^1.0.1",
     "@playwright/test": "^1.49.1",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
+    "@vitest/coverage-v8": "^2.1.9",
     "@vitest/ui": "^2.1.9",
     "fake-indexeddb": "^6.0.0",
     "http-server": "^14.1.1",

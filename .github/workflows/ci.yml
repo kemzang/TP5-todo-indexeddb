@@ -17,8 +17,11 @@ jobs:
 
       - run: npm ci
 
-      - name: Tests unitaires (TDD - Vitest)
-        run: npm run test
+      - name: Tests unitaires (TDD - Vitest) avec couverture de code
+        run: npm run test:coverage
+
+      - name: Tests de mutation (StrykerJS)
+        run: npm run test:mutation
 
       - name: Tests comportementaux (BDD - Cucumber)
         run: npm run test:bdd

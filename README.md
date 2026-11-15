@@ -57,12 +57,31 @@ npx playwright install chromium
 ## Lancer les tests
 
 ```bash
-npm run test         # TDD - Vitest (26 tests)
+npm run test         # TDD - Vitest (37 tests)
 npm run test:bdd     # BDD - Cucumber.js sur la couche données (8 scénarios)
 npm run test:bdd:ui  # BDD - Cucumber.js piloté dans Chromium (14 scénarios)
 npm run test:e2e     # E2E - Playwright (12 tests, vrai navigateur)
 npm run test:all     # toutes les suites
 ```
+
+## Couverture de code et tests de mutation
+
+```bash
+npm run test:coverage    # couverture (Vitest + V8) de src/db.js
+npm run test:mutation    # tests de mutation (StrykerJS) sur src/db.js
+npm run report:coverage  # rapport HTML : lignes couvertes / non couvertes
+npm run report:mutation  # rapport HTML : chaque mutant et son statut
+```
+
+- **Couverture** : 100 % des lignes, branches, fonctions et instructions de `db.js`.
+  Seuils dans `vitest.config.js` (la commande échoue en dessous).
+- **Mutation** : Stryker modifie automatiquement `db.js` (opérateurs, conditions,
+  chaînes, blocs supprimés…) et vérifie qu'au moins un test échoue pour chaque mutant.
+  Score : **100 %** (aucun mutant survivant ni ignoré). Seuil d'échec : 90 %
+  (`stryker.config.mjs`).
+- Le passage de 88,6 % à 100 % a révélé des tests manquants (renommer une tâche terminée,
+  renommer un projet sans perdre sa description, messages d'erreur, transaction annulée)
+  et du code inutile (annulations de transaction sans effet), supprimé depuis.
 
 ## Démonstration : le robot utilise l'application
 
